@@ -1,0 +1,48 @@
+serial_number: w200-0000
+version: 0
+
+system:
+  ros2:
+    namespace: w200_0000
+
+platform:
+  mcu:
+    protocol: proton
+  attachments:
+    - name: arm_plate
+      type: w200.arm_plate
+      parent: default_mount
+
+# post removed: it only existed to hoist the lidar above the arm, which put the
+# arm + post inside the 360 deg scan and smeared the SLAM map. The lidar is now
+# front-mounted and low (see sensors.lidar2d below).
+
+manipulators:
+  arms:
+    - model: universal_robots
+      parent: arm_plate_mount
+      xyz: [0.0, 0.0, 0.0]
+      rpy: [0.0, 0.0, 0.0]
+      ur_type: ur5e   # or ur3e / ur10e
+      kinematics_parameters_file: "$(find ur_description)/config/ur5e/default_kinematics.yaml"
+sensors:
+  imu:
+    - model: phidgets_spatial
+      urdf_enabled: true
+      launch_enabled: true
+      parent: base_link
+      xyz: [0.059, 0.0, 0.161275]
+      rpy: [0.0, 0.0, 0.0]
+      ros_parameters:
+        phidgets_spatial:
+          data_interval_ms: 20
+  lidar2d:
+    - model: hokuyo_ust
+      # Front-mounted, low, ahead of the arm (A1). The chassis + arm now sit
+      # BEHIND the sensor, so they fall outside the forward-facing scan instead
+      # of being mapped as obstacles that move with the robot.
+      # NOTE: xyz are starting points -- verify against the real W200 deck height
+      # by viewing /scan in RViz and confirming no self-returns, then tune.
+      parent: default_mount
+      xyz: [0.45, 0.0, -0.25]   # 0.45 m forward of the arm, dropped ~0.25 m below the deck
+      rpy: [0.0, 0.0, 0.0]

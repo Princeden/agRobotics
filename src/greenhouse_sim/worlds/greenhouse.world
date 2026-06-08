@@ -1,0 +1,179 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <world name="greenhouse">
+
+    <!-- Physics -->
+    <physics type="ode">
+      <real_time_factor>1.0</real_time_factor>
+      <max_step_size>0.001</max_step_size>
+    </physics>
+
+    <!-- Sun -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- Optional: Remove default flat ground plane if z-fighting occurs -->
+    <model name="my_floor">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="floor_link">
+        <collision name="floor_collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>40 40</size> <!-- Floor dimensions in meters -->
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="floor_visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>40 40</size>
+            </plane>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name> 
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Shelf 1 -->
+    <include>
+      <name>shelf_1</name>
+      <uri>model://greenhouse_shelf</uri>
+      <pose>0.0 0.0 0.0 0 0 0</pose>
+    </include>
+
+    <!-- Shelf 2 -->
+    <include>
+      <name>shelf_2</name>
+      <uri>model://greenhouse_shelf_metal</uri>
+      <pose>0.0 2.5 0.0 0 0 0</pose>
+    </include>
+
+    <!-- Shelf 3 -->
+    <include>
+      <name>shelf_3</name>
+      <uri>model://greenhouse_shelf</uri>
+      <pose>0.0 5 0.0 0 0 0</pose>
+    </include>
+
+
+    <!-- Shelf 4 -->
+    <include>
+      <name>shelf_4</name>
+      <uri>model://greenhouse_shelf_metal</uri>
+      <pose>0.0 -2.5 0.0 0 0 0</pose>
+    </include>
+
+    <!-- North wall -->
+    <model name="bbox_north">
+      <static>true</static>
+      <pose>0 7.325 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>34.1 0.1 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>34.1 0.1 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- South wall -->
+    <model name="bbox_south">
+      <static>true</static>
+      <pose>0 -4.825 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>34.1 0.1 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>34.1 0.1 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- East wall -->
+    <model name="bbox_east">
+      <static>true</static>
+      <pose>17.05 1.25 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.1 12.15 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.1 12.15 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- West wall -->
+    <model name="bbox_west">
+      <static>true</static>
+      <pose>-17.05 1.25 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.1 12.15 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.1 12.15 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

@@ -1,0 +1,27 @@
+material Shelf/Wood
+{
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture wood_texture.jpg
+      }
+    }
+  }
+}
+
+material Shelf/Metal
+{
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture metal_texture.jpg
+      }
+    }
+  }
+}

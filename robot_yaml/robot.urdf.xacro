@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="w200-0000">
+
+  <!-- Common -->
+  <xacro:include filename="$(find clearpath_platform_description)/urdf/common.urdf.xacro"/>
+
+  <!-- Platform -->
+  <xacro:include filename="$(find clearpath_platform_description)/urdf/w200/w200.urdf.xacro"/>
+  <xacro:w200 wheel="default"/>
+
+
+  <!-- Attachments -->
+
+  <xacro:include filename="$(find clearpath_platform_description)/urdf/w200/attachments/arm_plate.urdf.xacro"/>
+  <xacro:arm_plate name="arm_plate" model="default" parent_link="default_mount">
+    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </xacro:arm_plate>
+
+
+  <!-- Links -->
+
+
+  <!-- Mounts -->
+
+  <!-- post_0 -->
+  <xacro:include filename="$(find clearpath_mounts_description)/urdf/post.urdf.xacro"/>
+  <xacro:post name="post_0" parent_link="default_mount" model="single" spacing="0.08" height="0.5">
+    <origin xyz="-0.3 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </xacro:post>
+
+
+  <!-- Sensors -->
+
+  <!-- lidar2d_0 -->
+  <xacro:include filename="$(find clearpath_sensors_description)/urdf/hokuyo_ust.urdf.xacro"/>
+  <xacro:hokuyo_ust name="lidar2d_0" parent_link="post_0_mount" ang_res="0.5" min_ang="-3.141592653589793" max_ang="3.141592653589793" min_range="0.05" max_range="25.0" update_rate="50">
+    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </xacro:hokuyo_ust>
+
+  <!-- imu_1 -->
+  <xacro:include filename="$(find clearpath_sensors_description)/urdf/phidgets_spatial.urdf.xacro"/>
+  <xacro:phidgets_spatial name="imu_1" parent_link="base_link">
+    <origin xyz="0.059 0.0 0.161275" rpy="0.0 0.0 0.0"/>
+  </xacro:phidgets_spatial>
+
+
+  <!-- Manipulators -->
+
+  <!-- arm_0 -->
+  <xacro:include filename="$(find clearpath_manipulators_description)/urdf/arm/universal_robots.urdf.xacro"/>
+  <xacro:universal_robots name="arm_0" parent_link="arm_plate_mount" ur_type="ur5e" kinematics_parameters_file="$(find ur_description)/config/ur5e/default_kinematics.yaml" robot_ip="192.168.131.40">
+    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </xacro:universal_robots>
+
+
+  <!-- Extras -->
+
+
+</robot>
