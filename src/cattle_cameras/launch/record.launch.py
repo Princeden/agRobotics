@@ -33,7 +33,7 @@ def declare_args():
         # `yolo`/`view` are evaluated by IfCondition -> lowercase true/false.
         DeclareLaunchArgument(
             "yolo",
-            default_value="true",
+            default_value="false",
             description="Run a per-camera YOLO detector (on by default).",
         ),
         DeclareLaunchArgument(
@@ -92,9 +92,7 @@ def resolve_tracker(value):
     """
     if os.path.isabs(value) or os.sep in value:
         return value
-    local = os.path.join(
-        get_package_share_directory("cattle_cameras"), "config", value
-    )
+    local = os.path.join(get_package_share_directory("cattle_cameras"), "config", value)
     return local if os.path.exists(local) else value
 
 
