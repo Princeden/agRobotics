@@ -14,3 +14,7 @@
 build
 install
 log
+
+#ros bags
+realsense_data*/
+

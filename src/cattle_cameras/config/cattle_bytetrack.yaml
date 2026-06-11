@@ -1,0 +1,22 @@
+# ByteTrack tuned for a fixed camera watching similar-looking cattle.
+# Pure motion/IoU association (no appearance ReID), which is the most stable
+# choice when objects look alike. See https://docs.ultralytics.com/modes/track/
+tracker_type: bytetrack
+
+# Confidence to start matching a detection. Lower than default so animals that
+# dip in confidence (partial occlusion, motion blur) still get associated.
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+
+# Require a fairly confident detection before spawning a NEW id. Higher than the
+# 0.25 default to stop low-confidence blips from creating throwaway ids.
+new_track_thresh: 0.5
+
+# Frames to keep a lost track alive before retiring its id. At ~27 fps, 90
+# frames ~= 3 s, so an animal can be occluded for a few seconds and keep its id.
+track_buffer: 90
+
+# IoU/cost association threshold. Default works well; lower slightly if ids swap.
+match_thresh: 0.8
+
+fuse_score: True

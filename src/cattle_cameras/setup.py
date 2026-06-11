@@ -12,6 +12,8 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + "/launch", glob("launch/*.launch.py")),
+        ("share/" + package_name + "/config", glob("config/*.yaml")),
+        ("share/" + package_name + "/weights", glob("weights/*.pt")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -25,6 +27,8 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "detection_viewer = cattle_cameras.detection_viewer:main",
+        ],
     },
 )

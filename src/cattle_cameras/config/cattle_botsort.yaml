@@ -1,0 +1,23 @@
+# BoT-SORT configured for a FIXED camera watching similar-looking cattle.
+# The two BoT-SORT extras are deliberately disabled here:
+#   * ReID (with_reid) swaps ids between look-alike animals -> turned OFF.
+#   * GMC (camera-motion compensation) jitters tracks on a static camera -> none.
+# With both off this behaves like a steadier ByteTrack; flip them on only for a
+# moving camera / visually distinct objects. https://docs.ultralytics.com/modes/track/
+tracker_type: botsort
+
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+new_track_thresh: 0.5
+track_buffer: 90
+match_thresh: 0.8
+fuse_score: True
+
+# BoT-SORT specifics
+gmc_method: none          # static camera: no global motion compensation
+
+# ReID — off because cattle look alike and appearance matching causes id swaps
+proximity_thresh: 0.5
+appearance_thresh: 0.8
+with_reid: False
+model: auto

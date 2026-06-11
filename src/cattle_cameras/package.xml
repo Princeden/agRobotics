@@ -14,6 +14,12 @@
 
   <exec_depend>realsense2_camera</exec_depend>
   <exec_depend>librealsense2-utils</exec_depend>
+  <exec_depend>image_transport_plugins</exec_depend>
+  <exec_depend>yolo_bringup</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
   <export>
     <build_type>ament_python</build_type>
   </export>
