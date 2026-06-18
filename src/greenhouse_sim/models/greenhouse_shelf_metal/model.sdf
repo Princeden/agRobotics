@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <sdf version="1.7">
-  <model name="greenhouse_shelf">
+  <model name="greenhouse_shelf_metal">
 
     <!-- Shelf won't move -->
     <static>true</static>
 
     <link name="shelf_link">
 
-      <!-- Visual mesh -->
+      <!-- Original visual mesh, with Gazebo Sim color fallback. -->
       <visual name="shelf_visual">
         <geometry>
           <mesh>
@@ -16,14 +16,10 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-      <uri>model://greenhouse_shelf/materials/scripts/</uri>
-      <uri>model://greenhouse_shelf/materials/textures/</uri>
-      <name>Shelf/Metal</name>
-    </script>
+          <ambient>0.42 0.44 0.45 1</ambient>
+          <diffuse>0.68 0.70 0.70 1</diffuse>
+          <specular>0.35 0.35 0.35 1</specular>
         </material>
-
-
       </visual>
 
       <!-- Collision mesh -->

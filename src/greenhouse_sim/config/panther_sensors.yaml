@@ -1,0 +1,23 @@
+# Panther sensor placement for greenhouse simulation.
+#
+# Edit xyz/rpy to change each sensor transform relative to parent_link.
+# Supported lidar channel counts with Husarion stock components:
+#   16  -> Velodyne Puck (LDR20)
+#   32  -> Ouster OS0 32 (LDR10)
+#   64  -> Ouster OS0 64 (LDR11)
+#   128 -> Ouster OS0 128 (LDR12)
+lidar:
+  enabled: true
+  channels: 16
+  parent_link: mount_link
+  device_namespace: front_lidar
+  xyz: 0.19 0.06 0.03
+  rpy: 0.0 0.0 0.0
+
+camera:
+  enabled: true
+  type: CAM03
+  parent_link: mount_link
+  device_namespace: zed
+  xyz: 0.3 0.0 -0.04
+  rpy: 0.0 0.0 0.0

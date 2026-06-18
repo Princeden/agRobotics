@@ -1,0 +1,20 @@
+pointcloud_to_laserscan:
+  ros__parameters:
+    use_sim_time: true
+    target_frame: panther/front_lidar_velodyne
+    transform_tolerance: 0.05
+    min_height: -1.0
+    max_height: 1.0
+    angle_min: -3.141592653589793
+    angle_max: 3.141592653589793
+    angle_increment: 0.004363323
+    scan_time: 0.1
+    range_min: 0.45
+    range_max: 30.0
+    use_inf: true
+    inf_epsilon: 1.0
+    queue_size: 10
+    qos_overrides:
+      /panther/front_lidar/velodyne_points:
+        subscription:
+          reliability: best_effort

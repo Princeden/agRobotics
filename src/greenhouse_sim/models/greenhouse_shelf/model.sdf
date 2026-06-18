@@ -7,7 +7,7 @@
 
     <link name="shelf_link">
 
-      <!-- Visual mesh -->
+      <!-- Original visual mesh, with Gazebo Sim color fallback. -->
       <visual name="shelf_visual">
         <geometry>
           <mesh>
@@ -16,14 +16,10 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-      <uri>model://greenhouse_shelf/materials/scripts/</uri>
-      <uri>model://greenhouse_shelf/materials/textures/</uri>
-      <name>Shelf/Wood</name>
-    </script>
+          <ambient>0.58 0.39 0.22 1</ambient>
+          <diffuse>0.72 0.49 0.28 1</diffuse>
+          <specular>0.08 0.06 0.04 1</specular>
         </material>
-
-
       </visual>
 
       <!-- Collision mesh -->
