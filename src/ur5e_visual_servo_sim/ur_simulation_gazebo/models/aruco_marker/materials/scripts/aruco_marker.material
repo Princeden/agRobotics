@@ -1,0 +1,23 @@
+// OGRE material for the ArUco demo marker (DICT_4X4_50, id 0).
+// Fully ambient/diffuse white so the texture reads correctly under any
+// lighting, with point filtering to keep the black/white squares crisp
+// (bilinear filtering blurs marker edges and hurts detection).
+material ArucoMarker/Marker
+{
+  technique
+  {
+    pass
+    {
+      lighting on
+      ambient 1 1 1 1
+      diffuse 1 1 1 1
+      specular 0 0 0 0 0
+
+      texture_unit
+      {
+        texture aruco_marker.png
+        filtering none
+      }
+    }
+  }
+}

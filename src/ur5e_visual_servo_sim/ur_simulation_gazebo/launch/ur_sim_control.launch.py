@@ -30,6 +30,7 @@
 
 from launch import LaunchDescription
 from launch.actions import (
+    AppendEnvironmentVariable,
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     OpaqueFunction,
@@ -172,6 +173,15 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(start_joint_controller),
     )
 
+    # Make this package's models/ discoverable by Gazebo so model:// URIs in
+    # the world (e.g. the aruco_marker demo target) resolve. gzserver.launch.py
+    # appends the existing GAZEBO_MODEL_PATH to its own, so setting it here is
+    # robust and does not depend on the gazebo_ros package.xml export scanner.
+    set_gazebo_model_path = AppendEnvironmentVariable(
+        "GAZEBO_MODEL_PATH",
+        PathJoinSubstitution([FindPackageShare("ur_simulation_gazebo"), "models"]),
+    )
+
     # Gazebo nodes
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -213,6 +223,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     nodes_to_start = [
+        set_gazebo_model_path,
         robot_state_publisher_node,
         joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,

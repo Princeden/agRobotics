@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="aruco_marker">
+    <!-- Static: the marker holds its placed pose. It can still be repositioned
+         at runtime (GUI translate tool, or /demo/set_entity_state) to drive the
+         servo loop and watch the arm track it. -->
+    <static>true</static>
+    <link name="link">
+      <pose>0 0 0 0 0 0</pose>
+
+      <!-- Thin plate: 1 cm deep, 25 cm square. The large faces are +/-x,
+           so the marker is read out of the model's -x face. -->
+      <collision name="collision">
+        <geometry>
+          <box><size>0.01 0.25 0.25</size></box>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <box><size>0.01 0.25 0.25</size></box>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://aruco_marker/materials/scripts</uri>
+            <uri>model://aruco_marker/materials/textures</uri>
+            <name>ArucoMarker/Marker</name>
+          </script>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

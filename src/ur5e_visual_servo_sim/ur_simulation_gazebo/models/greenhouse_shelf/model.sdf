@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="greenhouse_shelf">
+
+    <!-- Shelf won't move -->
+    <static>true</static>
+
+    <link name="shelf_link">
+
+      <!-- Visual mesh -->
+      <visual name="shelf_visual">
+        <geometry>
+          <mesh>
+            <uri>model://greenhouse_shelf/meshes/greenhouse_shelf.stl</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+      <uri>model://greenhouse_shelf/materials/scripts/</uri>
+      <uri>model://greenhouse_shelf/materials/textures/</uri>
+      <name>Shelf/Wood</name>
+    </script>
+        </material>
+
+
+      </visual>
+
+      <!-- Collision mesh -->
+      <collision name="shelf_collision">
+        <geometry>
+          <mesh>
+            <uri>model://greenhouse_shelf/meshes/greenhouse_shelf.stl</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </collision>
+
+    </link>
+
+  </model>
+</sdf>
