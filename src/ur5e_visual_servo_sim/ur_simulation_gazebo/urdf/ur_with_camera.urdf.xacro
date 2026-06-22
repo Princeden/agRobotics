@@ -1,0 +1,107 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="$(arg name)">
+
+  <!-- ===================================================================== -->
+  <!-- UR arm + wrist-mounted Intel RealSense D435 (Gazebo Classic)          -->
+  <!--                                                                       -->
+  <!-- This description reuses the stock ur_description robot unchanged and  -->
+  <!-- bolts a RealSense D435 onto the tool flange (tool0). The real D435     -->
+  <!-- visual mesh and frame layout come from realsense2_description; the     -->
+  <!-- sensor itself is simulated with the gazebo_ros_camera plugin as a      -->
+  <!-- depth camera, so it produces color, depth and point-cloud streams      -->
+  <!-- like the real device.                                                  -->
+  <!--                                                                       -->
+  <!-- there is no dedicated RealSense Gazebo plugin installed, so the  -->
+  <!-- gazebo_ros_camera depth-camera plugin is used. The visual model and    -->
+  <!-- TF frames are the genuine RealSense ones.                              -->
+  <!-- ===================================================================== -->
+
+  <!-- robot name (must match the included description's root) -->
+  <xacro:arg name="name" default="ur" />
+
+  <!-- joint-name prefix, kept consistent with the underlying UR description -->
+  <xacro:arg name="tf_prefix" default="" />
+  <xacro:property name="tf_prefix" value="$(arg tf_prefix)" />
+
+  <!-- Pull in the standard UR robot. All of its arguments (ur_type,         -->
+  <!-- sim_gazebo, simulation_controllers, initial_positions_file, safety_*, -->
+  <!-- ...) are declared inside this file and are still set from the launch  -->
+  <!-- file's xacro command line.                                            -->
+  <xacro:include filename="$(find ur_description)/urdf/ur.urdf.xacro" />
+
+  <!-- RealSense D435 macro (visual mesh + nominal optical frames) -->
+  <xacro:include filename="$(find realsense2_description)/urdf/_d435.urdf.xacro" />
+
+  <!-- camera "instance" name; with an empty tf_prefix this yields the usual -->
+  <!-- camera_link / camera_color_optical_frame / ... frame names.           -->
+  <xacro:property name="camera_name" value="${tf_prefix}camera" />
+
+  <!-- Gazebo sensor type: "camera" (RGB only, most robust) or "depth"       -->
+  <!-- (adds depth image + colored point cloud, but needs server-side        -->
+  <!-- offscreen depth rendering, which crashes on some GPU/driver setups).  -->
+  <xacro:arg name="camera_sensor_type" default="depth" />
+  <xacro:property name="camera_sensor_type" value="$(arg camera_sensor_type)" />
+
+  <!-- ===================================================================== -->
+  <!-- Mount the D435 on tool0.                                              -->
+  <!--                                                                       -->
+  <!-- tool0 +z points straight out of the flange. The D435 looks along the  -->
+  <!-- +x axis of its own frame, so rotating the mount by -90 deg about y    -->
+  <!-- makes the camera look "forward" out of the tool. A small +z offset    -->
+  <!-- keeps the body off the flange face.                                   -->
+  <!-- ===================================================================== -->
+  <xacro:sensor_d435
+    parent="${tf_prefix}tool0"
+    name="${camera_name}"
+    use_nominal_extrinsics="true"
+    use_mesh="true">
+    <origin xyz="0 0 0.01" rpy="${pi/2} ${-pi/2} 0" />
+  </xacro:sensor_d435>
+
+  <!-- ===================================================================== -->
+  <!-- Gazebo Classic depth-camera sensor + ROS plugin                       -->
+  <!--                                                                       -->
+  <!-- Attached to <camera>_link (the body link that carries the mesh and    -->
+  <!-- inertia, so Gazebo will not collapse it via fixed-joint reduction).   -->
+  <!-- Its +x axis is the viewing direction. Published frame is the color    -->
+  <!-- optical frame, matching the real driver's convention.                 -->
+  <!-- ===================================================================== -->
+  <gazebo reference="${camera_name}_link">
+    <sensor name="${camera_name}_d435" type="${camera_sensor_type}">
+      <always_on>true</always_on>
+      <update_rate>30.0</update_rate>
+      <visualize>true</visualize>
+      <camera name="${camera_name}">
+        <!-- D435 color stream is ~69.4 deg horizontal FOV -->
+        <horizontal_fov>1.211259</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>100.0</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+      <plugin name="${camera_name}_controller" filename="libgazebo_ros_camera.so">
+        <ros>
+          <namespace>${camera_name}</namespace>
+        </ros>
+        <!-- gazebo_ros_camera publishes at /<namespace>/<camera_name>/image_raw -->
+        <!-- => /camera/color/image_raw, /camera/color/camera_info, and (in     -->
+        <!-- depth mode) /camera/color/depth/image_raw + /camera/color/points.  -->
+        <camera_name>color</camera_name>
+        <frame_name>${camera_name}_color_optical_frame</frame_name>
+        <min_depth>0.1</min_depth>
+        <max_depth>10.0</max_depth>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+</robot>

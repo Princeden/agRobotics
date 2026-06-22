@@ -1,0 +1,91 @@
+<?xml version="1.0" ?>
+<!--
+  Example custom world for the UR + camera simulation.
+
+  Load it with:
+    ros2 launch ur_simulation_gazebo ur_sim_control.launch.py \
+      world:=$(ros2 pkg prefix ur_simulation_gazebo)/share/ur_simulation_gazebo/worlds/example.world
+
+  It is just the standard ground + sun plus a few colored objects placed a
+  short distance from the robot base so the wrist camera has something to see.
+  Copy this file as a starting point for your own worlds.
+-->
+<sdf version="1.6">
+  <world name="default">
+
+    <!-- A global light source -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- A ground plane -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- Some objects in front of the robot for the camera to look at -->
+    <model name="red_box">
+      <pose>0.8 0.0 0.1 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.2 0.2 0.2</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.2 0.2 0.2</size></box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.1 0.1 1</ambient>
+            <diffuse>0.8 0.1 0.1 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="green_cylinder">
+      <pose>0.7 0.4 0.15 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder><radius>0.1</radius><length>0.3</length></cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder><radius>0.1</radius><length>0.3</length></cylinder>
+          </geometry>
+          <material>
+            <ambient>0.1 0.7 0.1 1</ambient>
+            <diffuse>0.1 0.7 0.1 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="blue_sphere">
+      <pose>0.7 -0.4 0.12 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <sphere><radius>0.12</radius></sphere>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <sphere><radius>0.12</radius></sphere>
+          </geometry>
+          <material>
+            <ambient>0.1 0.2 0.8 1</ambient>
+            <diffuse>0.1 0.2 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
