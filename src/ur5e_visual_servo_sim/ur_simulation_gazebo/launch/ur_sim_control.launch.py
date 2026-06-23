@@ -28,6 +28,11 @@
 #
 # Author: Denis Stogl
 
+import os
+
+import yaml
+from ament_index_python.packages import get_package_share_directory
+
 from launch import LaunchDescription
 from launch.actions import (
     AppendEnvironmentVariable,
@@ -51,6 +56,18 @@ from launch_ros.substitutions import FindPackageShare
 from launch.actions import TimerAction
 
 
+def load_yaml(package_name, file_path):
+    """Load a YAML file from a package's share directory into a dict."""
+    absolute_file_path = os.path.join(
+        get_package_share_directory(package_name), file_path
+    )
+    try:
+        with open(absolute_file_path) as file:
+            return yaml.safe_load(file)
+    except OSError:
+        return None
+
+
 def launch_setup(context, *args, **kwargs):
     # Initialize Arguments
     ur_type = LaunchConfiguration("ur_type")
@@ -71,6 +88,7 @@ def launch_setup(context, *args, **kwargs):
     gazebo_gui = LaunchConfiguration("gazebo_gui")
     world = LaunchConfiguration("world")
     camera_sensor_type = LaunchConfiguration("camera_sensor_type")
+    use_servo = LaunchConfiguration("use_servo")
 
     initial_joint_controllers = PathJoinSubstitution(
         [FindPackageShare(runtime_config_package), "config", controllers_file]
@@ -210,6 +228,9 @@ def launch_setup(context, *args, **kwargs):
             "ur_type": ur_type,
             "launch_rviz": "true",
             "use_sim_time": "true",
+            # Suppress the stock servo_node from ur_moveit_config; we start our
+            # own below with the tuned eye-in-hand config (config/ur_servo.yaml).
+            "launch_servo": "false",
         }.items(),
     )
 
@@ -222,6 +243,50 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(launch_rviz),
     )
 
+    # MoveIt Servo (eye-in-hand visual servoing). Reuses the URDF
+    # (robot_description) built above, plus its own SRDF + kinematics; it
+    # consumes the planning scene that move_group (in the moveit include) owns.
+    robot_description_semantic_content = Command(
+        [
+            PathJoinSubstitution([FindExecutable(name="xacro")]),
+            " ",
+            PathJoinSubstitution(
+                [FindPackageShare("ur_moveit_config"), "srdf", "ur.srdf.xacro"]
+            ),
+            " ",
+            "name:=ur",
+            " ",
+            "prefix:=",
+            prefix,
+        ]
+    )
+    robot_description_semantic = {
+        "robot_description_semantic": robot_description_semantic_content
+    }
+
+    kinematics_yaml = PathJoinSubstitution(
+        [FindPackageShare("ur_moveit_config"), "config", "kinematics.yaml"]
+    )
+
+    servo_params = {"moveit_servo": load_yaml("ur5e_visual_servo", "config/ur_servo.yaml")}
+
+    servo_node = Node(
+        package="moveit_servo",
+        executable="servo_node_main",
+        output="screen",
+        parameters=[
+            servo_params,
+            robot_description,
+            robot_description_semantic,
+            kinematics_yaml,
+            {"use_sim_time": True},
+        ],
+        condition=IfCondition(use_servo),
+    )
+    # Give Gazebo, the controllers, and move_group time to come up before Servo
+    # starts pulling the planning scene and streaming commands.
+    delay_servo = TimerAction(period=12.0, actions=[servo_node])
+
     nodes_to_start = [
         set_gazebo_model_path,
         robot_state_publisher_node,
@@ -232,6 +297,7 @@ def launch_setup(context, *args, **kwargs):
         gazebo,
         gazebo_spawn_robot,
         moveit,
+        delay_servo,
     ]
 
     return nodes_to_start
@@ -376,6 +442,11 @@ def generate_launch_description():
             description="Gazebo camera sensor type for the wrist-mounted RealSense: \
         'camera' (RGB only) or 'depth' (adds depth image + colored point cloud). Depth mode \
         needs server-side offscreen depth rendering, which can crash on some GPU/driver setups.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "use_servo", default_value="true", description="Use visual servoing?"
         )
     )
 

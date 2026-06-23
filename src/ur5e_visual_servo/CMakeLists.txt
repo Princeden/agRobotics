@@ -28,6 +28,7 @@ add_executable(pbvs_controller src/pbvs_controller.cpp)
 ament_target_dependencies(pbvs_controller rclcpp geometry_msgs tf2)
 
 install(TARGETS aruco_detector  pbvs_controller DESTINATION lib/${PROJECT_NAME}) # need to add pbvs controller oncei mplemented
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
