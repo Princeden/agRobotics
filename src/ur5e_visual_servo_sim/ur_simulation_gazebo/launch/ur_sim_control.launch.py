@@ -27,6 +27,11 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 # Author: Denis Stogl
+#
+# Brings up the UR5e + wrist camera in Gazebo Classic with ros2_control, MoveIt
+# (move_group), and — for eye-in-hand visual servoing — MoveIt Servo. The body is
+# split into one builder function per subsystem (description, controllers, gazebo,
+# moveit, servo) so the wiring in launch_setup() reads top-to-bottom.
 
 import os
 
@@ -40,6 +45,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     OpaqueFunction,
     RegisterEventHandler,
+    TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
@@ -50,427 +56,293 @@ from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
 )
-
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-from launch.actions import TimerAction
 
 
 def load_yaml(package_name, file_path):
-    """Load a YAML file from a package's share directory into a dict."""
-    absolute_file_path = os.path.join(
-        get_package_share_directory(package_name), file_path
-    )
+    """Load a YAML file from a package's share directory into a dict (or None)."""
+    path = os.path.join(get_package_share_directory(package_name), file_path)
     try:
-        with open(absolute_file_path) as file:
-            return yaml.safe_load(file)
+        with open(path) as f:
+            return yaml.safe_load(f)
     except OSError:
         return None
 
 
-def launch_setup(context, *args, **kwargs):
-    # Initialize Arguments
-    ur_type = LaunchConfiguration("ur_type")
-    safety_limits = LaunchConfiguration("safety_limits")
-    safety_pos_margin = LaunchConfiguration("safety_pos_margin")
-    safety_k_position = LaunchConfiguration("safety_k_position")
-    # General arguments
-    runtime_config_package = LaunchConfiguration("runtime_config_package")
-    controllers_file = LaunchConfiguration("controllers_file")
-    initial_positions_file = LaunchConfiguration("initial_positions_file")
-    description_package = LaunchConfiguration("description_package")
-    description_file = LaunchConfiguration("description_file")
-    description_file = LaunchConfiguration("description_file")
-    prefix = LaunchConfiguration("prefix")
-    start_joint_controller = LaunchConfiguration("start_joint_controller")
-    initial_joint_controller = LaunchConfiguration("initial_joint_controller")
-    launch_rviz = LaunchConfiguration("launch_rviz")
-    gazebo_gui = LaunchConfiguration("gazebo_gui")
-    world = LaunchConfiguration("world")
-    camera_sensor_type = LaunchConfiguration("camera_sensor_type")
-    use_servo = LaunchConfiguration("use_servo")
+def _xacro(file_path, mappings):
+    """Build a `xacro <file> k:=v ...` Command substitution from a mappings dict."""
+    cmd = [FindExecutable(name="xacro"), " ", file_path]
+    for key, value in mappings.items():
+        cmd += [" ", f"{key}:=", value]
+    return Command(cmd)
 
-    initial_joint_controllers = PathJoinSubstitution(
-        [FindPackageShare(runtime_config_package), "config", controllers_file]
-    )
 
-    initial_positions_file_abs = PathJoinSubstitution(
-        [FindPackageShare(runtime_config_package), "config", initial_positions_file]
-    )
-
-    rviz_config_file = PathJoinSubstitution(
-        [FindPackageShare("ur_simulation_gazebo"), "rviz", "view_robot_camera.rviz"]
-    )
-
-    robot_description_content = Command(
-        [
-            PathJoinSubstitution([FindExecutable(name="xacro")]),
-            " ",
-            PathJoinSubstitution(
-                [FindPackageShare(description_package), "urdf", description_file]
-            ),
-            " ",
-            "safety_limits:=",
-            safety_limits,
-            " ",
-            "safety_pos_margin:=",
-            safety_pos_margin,
-            " ",
-            "safety_k_position:=",
-            safety_k_position,
-            " ",
-            "name:=",
-            "ur",
-            " ",
-            "ur_type:=",
-            ur_type,
-            " ",
-            "prefix:=",
-            prefix,
-            " ",
-            "sim_gazebo:=true",
-            " ",
-            "simulation_controllers:=",
-            initial_joint_controllers,
-            " ",
-            "initial_positions_file:=",
-            initial_positions_file_abs,
-            " ",
-            "camera_sensor_type:=",
-            camera_sensor_type,
-        ]
-    )
-    robot_description = {"robot_description": robot_description_content}
-
-    robot_state_publisher_node = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        output="both",
-        parameters=[{"use_sim_time": True}, robot_description],
-    )
-
-    rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="log",
-        arguments=["-d", rviz_config_file],
-        condition=IfCondition(launch_rviz),
-    )
-
-    joint_state_broadcaster_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "joint_state_broadcaster",
-            "--controller-manager",
-            "/controller_manager",
-        ],
-    )
-
-    # Delay rviz start after `joint_state_broadcaster`
-    delay_rviz_after_joint_state_broadcaster_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=joint_state_broadcaster_spawner,
-            on_exit=[rviz_node],
+def robot_description():
+    """The URDF (robot_description) from the wrist-camera xacro."""
+    pkg = LaunchConfiguration("runtime_config_package")
+    content = _xacro(
+        PathJoinSubstitution(
+            [
+                FindPackageShare(LaunchConfiguration("description_package")),
+                "urdf",
+                LaunchConfiguration("description_file"),
+            ]
         ),
-        condition=IfCondition(launch_rviz),
+        {
+            "safety_limits": LaunchConfiguration("safety_limits"),
+            "safety_pos_margin": LaunchConfiguration("safety_pos_margin"),
+            "safety_k_position": LaunchConfiguration("safety_k_position"),
+            "name": "ur",
+            "ur_type": LaunchConfiguration("ur_type"),
+            "prefix": LaunchConfiguration("prefix"),
+            "sim_gazebo": "true",
+            "simulation_controllers": PathJoinSubstitution(
+                [FindPackageShare(pkg), "config", LaunchConfiguration("controllers_file")]
+            ),
+            "initial_positions_file": PathJoinSubstitution(
+                [FindPackageShare(pkg), "config", LaunchConfiguration("initial_positions_file")]
+            ),
+            "camera_sensor_type": LaunchConfiguration("camera_sensor_type"),
+        },
     )
+    return {"robot_description": content}
 
-    # There may be other controllers of the joints, but this is the initially-started one
-    initial_joint_controller_spawner_started = Node(
+
+def robot_description_semantic():
+    """The SRDF (robot_description_semantic) for MoveIt / Servo."""
+    content = _xacro(
+        PathJoinSubstitution(
+            [FindPackageShare("ur_moveit_config"), "srdf", "ur.srdf.xacro"]
+        ),
+        {"name": "ur", "prefix": LaunchConfiguration("prefix")},
+    )
+    return {"robot_description_semantic": content}
+
+
+def _spawner(controller, *extra, condition=None):
+    return Node(
         package="controller_manager",
         executable="spawner",
-        arguments=[initial_joint_controller, "-c", "/controller_manager"],
-        condition=IfCondition(start_joint_controller),
-    )
-    initial_joint_controller_spawner_stopped = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[initial_joint_controller, "-c", "/controller_manager", "--stopped"],
-        condition=UnlessCondition(start_joint_controller),
+        arguments=[controller, "-c", "/controller_manager", *extra],
+        condition=condition,
     )
 
-    # Hybrid servoing: load the Servo target controller (forward_position_controller)
-    # alongside the initial one, but INACTIVE. The orchestrator switches to it for
-    # the TRACK phase and back to joint_trajectory_controller for planned APPROACH.
-    servo_controller = LaunchConfiguration("servo_controller")
-    servo_controller_spawner_stopped = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[servo_controller, "-c", "/controller_manager", "--stopped"],
-        condition=IfCondition(use_servo),
-    )
 
-    # Make this package's models/ discoverable by Gazebo so model:// URIs in
-    # the world (e.g. the aruco_marker demo target) resolve. gzserver.launch.py
-    # appends the existing GAZEBO_MODEL_PATH to its own, so setting it here is
-    # robust and does not depend on the gazebo_ros package.xml export scanner.
-    set_gazebo_model_path = AppendEnvironmentVariable(
+def controller_spawners():
+    """joint_state_broadcaster + the initial joint controller + (for hybrid
+    servoing) the Servo target controller loaded INACTIVE.
+
+    Returns (joint_state_broadcaster, [other spawners]); the broadcaster is split
+    out so RViz can be delayed until it is up.
+    """
+    initial = LaunchConfiguration("initial_joint_controller")
+    start = LaunchConfiguration("start_joint_controller")
+    jsb = _spawner("joint_state_broadcaster")
+    others = [
+        _spawner(initial, condition=IfCondition(start)),
+        _spawner(initial, "--stopped", condition=UnlessCondition(start)),
+        # Hybrid: forward_position_controller is what Servo commands during TRACK.
+        # Loaded inactive; the orchestrator activates it (and deactivates the
+        # joint_trajectory_controller) for servoing, and reverses it for APPROACH.
+        _spawner(
+            LaunchConfiguration("servo_controller"),
+            "--stopped",
+            condition=IfCondition(LaunchConfiguration("use_servo")),
+        ),
+    ]
+    return jsb, others
+
+
+def gazebo_nodes():
+    """Gazebo server/client, model path, and the robot spawn."""
+    # Make this package's models/ discoverable so model:// URIs in the world
+    # (e.g. the aruco_marker target) resolve. gzserver.launch.py appends to the
+    # existing GAZEBO_MODEL_PATH, so setting it here doesn't depend on the
+    # gazebo_ros package.xml export scanner.
+    model_path = AppendEnvironmentVariable(
         "GAZEBO_MODEL_PATH",
         PathJoinSubstitution([FindPackageShare("ur_simulation_gazebo"), "models"]),
     )
-
-    # Gazebo nodes
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [FindPackageShare("gazebo_ros"), "/launch", "/gazebo.launch.py"]
         ),
         launch_arguments={
-            "gui": gazebo_gui,
-            "world": world,
+            "gui": LaunchConfiguration("gazebo_gui"),
+            "world": LaunchConfiguration("world"),
         }.items(),
     )
-
-    # Spawn robot
-    gazebo_spawn_robot = Node(
+    spawn = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",
         name="spawn_ur",
         arguments=["-entity", "ur", "-topic", "robot_description"],
         output="screen",
     )
+    return [model_path, gazebo, spawn]
 
-    moveit = IncludeLaunchDescription(
+
+def moveit_node():
+    """move_group from ur_moveit_config. Its stock servo_node is suppressed
+    (launch_servo:=false); we run our own tuned one below."""
+    return IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [FindPackageShare("ur_moveit_config"), "/launch/ur_moveit.launch.py"]
         ),
         launch_arguments={
-            "ur_type": ur_type,
+            "ur_type": LaunchConfiguration("ur_type"),
             "launch_rviz": "true",
             "use_sim_time": "true",
-            # Suppress the stock servo_node from ur_moveit_config; we start our
-            # own below with the tuned eye-in-hand config (config/ur_servo.yaml).
             "launch_servo": "false",
         }.items(),
     )
 
-    rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="screen",
-        arguments=["-d", rviz_config_file],
-        condition=IfCondition(launch_rviz),
-    )
 
-    # MoveIt Servo (eye-in-hand visual servoing). Reuses the URDF
-    # (robot_description) built above, plus its own SRDF + kinematics; it
-    # consumes the planning scene that move_group (in the moveit include) owns.
-    robot_description_semantic_content = Command(
-        [
-            PathJoinSubstitution([FindExecutable(name="xacro")]),
-            " ",
-            PathJoinSubstitution(
-                [FindPackageShare("ur_moveit_config"), "srdf", "ur.srdf.xacro"]
-            ),
-            " ",
-            "name:=ur",
-            " ",
-            "prefix:=",
-            prefix,
-        ]
-    )
-    robot_description_semantic = {
-        "robot_description_semantic": robot_description_semantic_content
-    }
-
-    kinematics_yaml = PathJoinSubstitution(
+def servo_node(robot_desc):
+    """MoveIt Servo (eye-in-hand). Reuses the URDF, builds its own SRDF +
+    kinematics, and consumes the planning scene move_group owns. Delayed so
+    Gazebo, the controllers, and move_group are up first."""
+    kinematics = PathJoinSubstitution(
         [FindPackageShare("ur_moveit_config"), "config", "kinematics.yaml"]
     )
-
-    servo_params = {"moveit_servo": load_yaml("ur5e_visual_servo", "config/ur_servo.yaml")}
-
-    servo_node = Node(
+    node = Node(
         package="moveit_servo",
         executable="servo_node_main",
         output="screen",
         parameters=[
-            servo_params,
-            robot_description,
-            robot_description_semantic,
-            kinematics_yaml,
+            {"moveit_servo": load_yaml("ur5e_visual_servo", "config/ur_servo.yaml")},
+            robot_desc,
+            robot_description_semantic(),
+            kinematics,
             {"use_sim_time": True},
         ],
-        condition=IfCondition(use_servo),
+        condition=IfCondition(LaunchConfiguration("use_servo")),
     )
-    # Give Gazebo, the controllers, and move_group time to come up before Servo
-    # starts pulling the planning scene and streaming commands.
-    delay_servo = TimerAction(period=12.0, actions=[servo_node])
+    return TimerAction(period=12.0, actions=[node])
 
-    nodes_to_start = [
-        set_gazebo_model_path,
-        robot_state_publisher_node,
-        joint_state_broadcaster_spawner,
-        delay_rviz_after_joint_state_broadcaster_spawner,
-        initial_joint_controller_spawner_stopped,
-        initial_joint_controller_spawner_started,
-        servo_controller_spawner_stopped,
-        gazebo,
-        gazebo_spawn_robot,
-        moveit,
-        delay_servo,
+
+def launch_setup(context, *args, **kwargs):
+    robot_desc = robot_description()
+
+    robot_state_publisher = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        output="both",
+        parameters=[{"use_sim_time": True}, robot_desc],
+    )
+
+    rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="log",
+        arguments=[
+            "-d",
+            PathJoinSubstitution(
+                [FindPackageShare("ur_simulation_gazebo"), "rviz", "view_robot_camera.rviz"]
+            ),
+        ],
+        condition=IfCondition(LaunchConfiguration("launch_rviz")),
+    )
+
+    joint_state_broadcaster, other_controllers = controller_spawners()
+    # Hold RViz until joint_state_broadcaster is up (so TF/robot model are ready).
+    delay_rviz = RegisterEventHandler(
+        OnProcessExit(target_action=joint_state_broadcaster, on_exit=[rviz]),
+        condition=IfCondition(LaunchConfiguration("launch_rviz")),
+    )
+
+    return [
+        robot_state_publisher,
+        joint_state_broadcaster,
+        delay_rviz,
+        *other_controllers,
+        *gazebo_nodes(),
+        moveit_node(),
+        servo_node(robot_desc),
     ]
 
-    return nodes_to_start
 
-
-def generate_launch_description():
-    declared_arguments = []
-    # UR specific arguments
-    declared_arguments.append(
+def _declare_arguments():
+    return [
         DeclareLaunchArgument(
             "ur_type",
-            description="Type/series of used UR robot.",
-            choices=[
-                "ur3",
-                "ur3e",
-                "ur5",
-                "ur5e",
-                "ur7e",
-                "ur10",
-                "ur12e",
-                "ur10e",
-                "ur16e",
-                "ur20",
-                "ur30",
-            ],
             default_value="ur5e",
-        )
-    )
-    declared_arguments.append(
+            choices=["ur3", "ur3e", "ur5", "ur5e", "ur7e", "ur10", "ur12e",
+                     "ur10e", "ur16e", "ur20", "ur30"],
+            description="Type/series of used UR robot.",
+        ),
         DeclareLaunchArgument(
-            "safety_limits",
-            default_value="true",
+            "safety_limits", default_value="true",
             description="Enables the safety limits controller if true.",
-        )
-    )
-    declared_arguments.append(
+        ),
         DeclareLaunchArgument(
-            "safety_pos_margin",
-            default_value="0.15",
+            "safety_pos_margin", default_value="0.15",
             description="The margin to lower and upper limits in the safety controller.",
-        )
-    )
-    declared_arguments.append(
+        ),
         DeclareLaunchArgument(
-            "safety_k_position",
-            default_value="20",
+            "safety_k_position", default_value="20",
             description="k-position factor in the safety controller.",
-        )
-    )
-    # General arguments
-    declared_arguments.append(
+        ),
         DeclareLaunchArgument(
-            "runtime_config_package",
-            default_value="ur_simulation_gazebo",
-            description='Package with the controller\'s configuration in "config" folder. \
-        Usually the argument is not set, it enables use of a custom setup.',
-        )
-    )
-    declared_arguments.append(
+            "runtime_config_package", default_value="ur_simulation_gazebo",
+            description="Package with the controllers' config in its 'config' folder.",
+        ),
         DeclareLaunchArgument(
-            "controllers_file",
-            default_value="ur_controllers.yaml",
+            "controllers_file", default_value="ur_controllers.yaml",
             description="YAML file with the controllers configuration.",
-        )
-    )
-    declared_arguments.append(
+        ),
         DeclareLaunchArgument(
             "initial_positions_file",
             default_value=PathJoinSubstitution(
-                [
-                    FindPackageShare("ur_description"),
-                    "config",
-                    "initial_positions.yaml",
-                ]
+                [FindPackageShare("ur_description"), "config", "initial_positions.yaml"]
             ),
             description="YAML file (absolute path) with the robot's initial joint positions.",
-        )
-    )
-    declared_arguments.append(
+        ),
         DeclareLaunchArgument(
-            "description_package",
-            default_value="ur_simulation_gazebo",
-            description="Description package with robot URDF/XACRO files. Usually the argument \
-        is not set, it enables use of a custom description.",
-        )
-    )
-    declared_arguments.append(
+            "description_package", default_value="ur_simulation_gazebo",
+            description="Description package with the robot URDF/XACRO files.",
+        ),
         DeclareLaunchArgument(
-            "description_file",
-            default_value="ur_with_camera.urdf.xacro",
-            description="URDF/XACRO description file with the robot. Defaults to the UR arm \
-        with a wrist-mounted camera.",
-        )
-    )
-    declared_arguments.append(
+            "description_file", default_value="ur_with_camera.urdf.xacro",
+            description="URDF/XACRO file. Defaults to the UR arm with a wrist camera.",
+        ),
         DeclareLaunchArgument(
-            "prefix",
-            default_value='""',
-            description="Prefix of the joint names, useful for \
-        multi-robot setup. If changed than also joint names in the controllers' configuration \
-        have to be updated.",
-        )
-    )
-    declared_arguments.append(
+            "prefix", default_value='""',
+            description="Joint-name prefix for multi-robot setups (must match the "
+                        "controllers' config).",
+        ),
         DeclareLaunchArgument(
-            "start_joint_controller",
-            default_value="true",
-            description="Enable headless mode for robot control",
-        )
-    )
-    declared_arguments.append(
+            "start_joint_controller", default_value="true",
+            description="Start the initial joint controller active (else loaded stopped).",
+        ),
         DeclareLaunchArgument(
-            "initial_joint_controller",
-            default_value="joint_trajectory_controller",
-            description="Robot controller to start.",
-        )
-    )
-    declared_arguments.append(
+            "initial_joint_controller", default_value="joint_trajectory_controller",
+            description="Initially-active joint controller. For hybrid servoing keep "
+                        "this as joint_trajectory_controller (used for planned APPROACH).",
+        ),
+        DeclareLaunchArgument("launch_rviz", default_value="true", description="Launch RViz?"),
+        DeclareLaunchArgument("gazebo_gui", default_value="true", description="Start gazebo with GUI?"),
         DeclareLaunchArgument(
-            "launch_rviz", default_value="true", description="Launch RViz?"
-        )
-    )
-    declared_arguments.append(
+            "world", default_value="",
+            description="Absolute path to a Gazebo .world file (empty = default empty world). "
+                        "e.g. world:=$(ros2 pkg prefix ur_simulation_gazebo)/share/"
+                        "ur_simulation_gazebo/worlds/servo_demo.world",
+        ),
         DeclareLaunchArgument(
-            "gazebo_gui", default_value="true", description="Start gazebo with GUI?"
-        )
-    )
-    declared_arguments.append(
+            "camera_sensor_type", default_value="depth", choices=["camera", "depth"],
+            description="Wrist RealSense sensor type: 'camera' (RGB only) or 'depth' "
+                        "(adds depth image + point cloud; heavier, needs offscreen depth render).",
+        ),
+        DeclareLaunchArgument("use_servo", default_value="true", description="Launch MoveIt Servo?"),
         DeclareLaunchArgument(
-            "world",
-            default_value="",
-            description="Absolute path to a Gazebo .world file to load. Leave empty to use \
-        Gazebo's default empty world. To use a world shipped with this package, pass e.g. \
-        world:=$(ros2 pkg prefix ur_simulation_gazebo)/share/ur_simulation_gazebo/worlds/<name>.world",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "camera_sensor_type",
-            default_value="depth",
-            choices=["camera", "depth"],
-            description="Gazebo camera sensor type for the wrist-mounted RealSense: \
-        'camera' (RGB only) or 'depth' (adds depth image + colored point cloud). Depth mode \
-        needs server-side offscreen depth rendering, which can crash on some GPU/driver setups.",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "use_servo", default_value="true", description="Use visual servoing?"
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "servo_controller",
-            default_value="forward_position_controller",
-            description="Controller MoveIt Servo commands during TRACK. Loaded "
-            "inactive; the orchestrator activates it and deactivates "
-            "initial_joint_controller during servoing.",
-        )
-    )
+            "servo_controller", default_value="forward_position_controller",
+            description="Controller MoveIt Servo commands during TRACK. Loaded inactive; "
+                        "the orchestrator activates it during servoing.",
+        ),
+    ]
 
-    return LaunchDescription(
-        declared_arguments + [OpaqueFunction(function=launch_setup)]
-    )
+
+def generate_launch_description():
+    return LaunchDescription(_declare_arguments() + [OpaqueFunction(function=launch_setup)])
