@@ -191,6 +191,17 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(start_joint_controller),
     )
 
+    # Hybrid servoing: load the Servo target controller (forward_position_controller)
+    # alongside the initial one, but INACTIVE. The orchestrator switches to it for
+    # the TRACK phase and back to joint_trajectory_controller for planned APPROACH.
+    servo_controller = LaunchConfiguration("servo_controller")
+    servo_controller_spawner_stopped = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[servo_controller, "-c", "/controller_manager", "--stopped"],
+        condition=IfCondition(use_servo),
+    )
+
     # Make this package's models/ discoverable by Gazebo so model:// URIs in
     # the world (e.g. the aruco_marker demo target) resolve. gzserver.launch.py
     # appends the existing GAZEBO_MODEL_PATH to its own, so setting it here is
@@ -294,6 +305,7 @@ def launch_setup(context, *args, **kwargs):
         delay_rviz_after_joint_state_broadcaster_spawner,
         initial_joint_controller_spawner_stopped,
         initial_joint_controller_spawner_started,
+        servo_controller_spawner_stopped,
         gazebo,
         gazebo_spawn_robot,
         moveit,
@@ -447,6 +459,15 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "use_servo", default_value="true", description="Use visual servoing?"
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "servo_controller",
+            default_value="forward_position_controller",
+            description="Controller MoveIt Servo commands during TRACK. Loaded "
+            "inactive; the orchestrator activates it and deactivates "
+            "initial_joint_controller during servoing.",
         )
     )
 
