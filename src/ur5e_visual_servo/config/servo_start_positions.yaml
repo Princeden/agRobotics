@@ -2,8 +2,8 @@
 # Camera aims at the marker, well clear of singularities & joint limits.
 # aim=0.4deg dist=0.32m cond=12 limit_margin=0.62rad
 shoulder_pan_joint: -4.7822
-shoulder_lift_joint: 0
-elbow_joint: -1.71042
-wrist_1_joint: -1.5708
-wrist_2_joint: 4.7822
+shoulder_lift_joint: 4.93928
+elbow_joint: -1.88496
+wrist_1_joint: 0.890118
+wrist_2_joint: -5.00909
 wrist_3_joint: 0

@@ -1,0 +1,3 @@
+[submodule "src/sensorPlatform"]
+	path = src/sensorPlatform
+	url = git@github.com:Princeden/sensorPlatform.git

@@ -94,16 +94,24 @@ def robot_description():
             "safety_pos_margin": LaunchConfiguration("safety_pos_margin"),
             "safety_k_position": LaunchConfiguration("safety_k_position"),
             "name": "ur",
-            "ur_type": LaunchConfiguration("ur_type"),
+            "ur_type": "ur5e",
             "prefix": LaunchConfiguration("prefix"),
             "sim_gazebo": "true",
             "simulation_controllers": PathJoinSubstitution(
-                [FindPackageShare(pkg), "config", LaunchConfiguration("controllers_file")]
+                [
+                    FindPackageShare(pkg),
+                    "config",
+                    LaunchConfiguration("controllers_file"),
+                ]
             ),
             "initial_positions_file": PathJoinSubstitution(
-                [FindPackageShare(pkg), "config", LaunchConfiguration("initial_positions_file")]
+                [
+                    FindPackageShare(pkg),
+                    "config",
+                    LaunchConfiguration("initial_positions_file"),
+                ]
             ),
-            "camera_sensor_type": LaunchConfiguration("camera_sensor_type"),
+            "camera_sensor_type": "depth",
         },
     )
     return {"robot_description": content}
@@ -129,9 +137,13 @@ def _spawner(controller, *extra, condition=None):
     )
 
 
-def controller_spawners():
-    """joint_state_broadcaster + the initial joint controller + (for hybrid
+def controller_spawners(load_servo_controller):
+    """joint_state_broadcaster + the initial joint controller + (for HYBRID
     servoing) the Servo target controller loaded INACTIVE.
+
+    `load_servo_controller` adds forward_position_controller in --stopped state.
+    Skip it when the initial controller IS forward_position_controller (pure-servo
+    mode) — otherwise the same controller is spawned twice and conflicts.
 
     Returns (joint_state_broadcaster, [other spawners]); the broadcaster is split
     out so RViz can be delayed until it is up.
@@ -142,15 +154,9 @@ def controller_spawners():
     others = [
         _spawner(initial, condition=IfCondition(start)),
         _spawner(initial, "--stopped", condition=UnlessCondition(start)),
-        # Hybrid: forward_position_controller is what Servo commands during TRACK.
-        # Loaded inactive; the orchestrator activates it (and deactivates the
-        # joint_trajectory_controller) for servoing, and reverses it for APPROACH.
-        _spawner(
-            LaunchConfiguration("servo_controller"),
-            "--stopped",
-            condition=IfCondition(LaunchConfiguration("use_servo")),
-        ),
     ]
+    if load_servo_controller:
+        others.append(_spawner("forward_position_controller", "--stopped"))
     return jsb, others
 
 
@@ -191,7 +197,7 @@ def moveit_node():
             [FindPackageShare("ur_moveit_config"), "/launch/ur_moveit.launch.py"]
         ),
         launch_arguments={
-            "ur_type": LaunchConfiguration("ur_type"),
+            "ur_type": "ur5e",
             "launch_rviz": "true",
             "use_sim_time": "true",
             "launch_servo": "false",
@@ -222,6 +228,16 @@ def servo_node(robot_desc):
     return TimerAction(period=12.0, actions=[node])
 
 
+def visual_servoing_nodes():
+    shared_parameters = {"standoff": 0.5}
+    aruco_detector = Node(package="ur5e_visual_servo", executable="aruco_detector")
+    pbvs_controller = Node(
+        package="ur5e_visual_servo",
+        executable="pbvs_controller",
+        parameters=[shared_parameters],
+    )
+
+
 def launch_setup(context, *args, **kwargs):
     robot_desc = robot_description()
 
@@ -240,13 +256,23 @@ def launch_setup(context, *args, **kwargs):
         arguments=[
             "-d",
             PathJoinSubstitution(
-                [FindPackageShare("ur_simulation_gazebo"), "rviz", "view_robot_camera.rviz"]
+                [
+                    FindPackageShare("ur_simulation_gazebo"),
+                    "rviz",
+                    "view_robot_camera.rviz",
+                ]
             ),
         ],
         condition=IfCondition(LaunchConfiguration("launch_rviz")),
     )
 
-    joint_state_broadcaster, other_controllers = controller_spawners()
+    # Load the inactive servo controller only in HYBRID mode (Servo on, but the
+    # initial controller is NOT already forward_position_controller). In pure-servo
+    # mode the initial controller IS forward_position_controller, so don't re-spawn it.
+    initial = context.perform_substitution(LaunchConfiguration("initial_joint_controller"))
+    use_servo = context.perform_substitution(LaunchConfiguration("use_servo")).lower() == "true"
+    load_servo_controller = use_servo and initial != "forward_position_controller"
+    joint_state_broadcaster, other_controllers = controller_spawners(load_servo_controller)
     # Hold RViz until joint_state_broadcaster is up (so TF/robot model are ready).
     delay_rviz = RegisterEventHandler(
         OnProcessExit(target_action=joint_state_broadcaster, on_exit=[rviz]),
@@ -267,30 +293,28 @@ def launch_setup(context, *args, **kwargs):
 def _declare_arguments():
     return [
         DeclareLaunchArgument(
-            "ur_type",
-            default_value="ur5e",
-            choices=["ur3", "ur3e", "ur5", "ur5e", "ur7e", "ur10", "ur12e",
-                     "ur10e", "ur16e", "ur20", "ur30"],
-            description="Type/series of used UR robot.",
-        ),
-        DeclareLaunchArgument(
-            "safety_limits", default_value="true",
+            "safety_limits",
+            default_value="true",
             description="Enables the safety limits controller if true.",
         ),
         DeclareLaunchArgument(
-            "safety_pos_margin", default_value="0.15",
+            "safety_pos_margin",
+            default_value="0.15",
             description="The margin to lower and upper limits in the safety controller.",
         ),
         DeclareLaunchArgument(
-            "safety_k_position", default_value="20",
+            "safety_k_position",
+            default_value="20",
             description="k-position factor in the safety controller.",
         ),
         DeclareLaunchArgument(
-            "runtime_config_package", default_value="ur_simulation_gazebo",
+            "runtime_config_package",
+            default_value="ur_simulation_gazebo",
             description="Package with the controllers' config in its 'config' folder.",
         ),
         DeclareLaunchArgument(
-            "controllers_file", default_value="ur_controllers.yaml",
+            "controllers_file",
+            default_value="ur_controllers.yaml",
             description="YAML file with the controllers configuration.",
         ),
         DeclareLaunchArgument(
@@ -301,48 +325,52 @@ def _declare_arguments():
             description="YAML file (absolute path) with the robot's initial joint positions.",
         ),
         DeclareLaunchArgument(
-            "description_package", default_value="ur_simulation_gazebo",
+            "description_package",
+            default_value="ur_simulation_gazebo",
             description="Description package with the robot URDF/XACRO files.",
         ),
         DeclareLaunchArgument(
-            "description_file", default_value="ur_with_camera.urdf.xacro",
+            "description_file",
+            default_value="ur_with_camera.urdf.xacro",
             description="URDF/XACRO file. Defaults to the UR arm with a wrist camera.",
         ),
         DeclareLaunchArgument(
-            "prefix", default_value='""',
+            "prefix",
+            default_value='""',
             description="Joint-name prefix for multi-robot setups (must match the "
-                        "controllers' config).",
+            "controllers' config).",
         ),
         DeclareLaunchArgument(
-            "start_joint_controller", default_value="true",
+            "start_joint_controller",
+            default_value="true",
             description="Start the initial joint controller active (else loaded stopped).",
         ),
         DeclareLaunchArgument(
-            "initial_joint_controller", default_value="joint_trajectory_controller",
+            "initial_joint_controller",
+            default_value="joint_trajectory_controller",
             description="Initially-active joint controller. For hybrid servoing keep "
-                        "this as joint_trajectory_controller (used for planned APPROACH).",
+            "this as joint_trajectory_controller (used for planned APPROACH).",
         ),
-        DeclareLaunchArgument("launch_rviz", default_value="true", description="Launch RViz?"),
-        DeclareLaunchArgument("gazebo_gui", default_value="true", description="Start gazebo with GUI?"),
         DeclareLaunchArgument(
-            "world", default_value="",
+            "launch_rviz", default_value="true", description="Launch RViz?"
+        ),
+        DeclareLaunchArgument(
+            "gazebo_gui", default_value="true", description="Start gazebo with GUI?"
+        ),
+        DeclareLaunchArgument(
+            "world",
+            default_value="",
             description="Absolute path to a Gazebo .world file (empty = default empty world). "
-                        "e.g. world:=$(ros2 pkg prefix ur_simulation_gazebo)/share/"
-                        "ur_simulation_gazebo/worlds/servo_demo.world",
+            "e.g. world:=$(ros2 pkg prefix ur_simulation_gazebo)/share/"
+            "ur_simulation_gazebo/worlds/servo_demo.world",
         ),
         DeclareLaunchArgument(
-            "camera_sensor_type", default_value="depth", choices=["camera", "depth"],
-            description="Wrist RealSense sensor type: 'camera' (RGB only) or 'depth' "
-                        "(adds depth image + point cloud; heavier, needs offscreen depth render).",
-        ),
-        DeclareLaunchArgument("use_servo", default_value="true", description="Launch MoveIt Servo?"),
-        DeclareLaunchArgument(
-            "servo_controller", default_value="forward_position_controller",
-            description="Controller MoveIt Servo commands during TRACK. Loaded inactive; "
-                        "the orchestrator activates it during servoing.",
+            "use_servo", default_value="true", description="Launch MoveIt Servo?"
         ),
     ]
 
 
 def generate_launch_description():
-    return LaunchDescription(_declare_arguments() + [OpaqueFunction(function=launch_setup)])
+    return LaunchDescription(
+        _declare_arguments() + [OpaqueFunction(function=launch_setup)]
+    )

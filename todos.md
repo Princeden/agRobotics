@@ -5,7 +5,7 @@ Two Projects
 
 ### Visual Servoing
 
-- [ ] rewrite the code so that marker / aruco data is shared between relevant nodes
+- [X] rewrite the code so that marker / aruco data is shared between relevant nodes
 - [ ] write a servo orchestrator that switches between
 - [ ] test in sim?
 - [ ] create retry logic
