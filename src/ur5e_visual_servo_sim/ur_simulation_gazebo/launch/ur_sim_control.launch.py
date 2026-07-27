@@ -42,6 +42,7 @@ from launch import LaunchDescription
 from launch.actions import (
     AppendEnvironmentVariable,
     DeclareLaunchArgument,
+    ExecuteProcess,
     IncludeLaunchDescription,
     OpaqueFunction,
     RegisterEventHandler,
@@ -228,6 +229,25 @@ def servo_node(robot_desc):
     return TimerAction(period=12.0, actions=[node])
 
 
+def start_servo_call():
+    """moveit_servo's ServoNode boots paused and silently drops twist commands
+    until /servo_node/start_servo (std_srvs/Trigger) is called once. Fire it
+    shortly after servo_node's own startup delay."""
+    call = ExecuteProcess(
+        cmd=[
+            "ros2",
+            "service",
+            "call",
+            "/servo_node/start_servo",
+            "std_srvs/srv/Trigger",
+            "{}",
+        ],
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("use_servo")),
+    )
+    return TimerAction(period=14.0, actions=[call])
+
+
 def visual_servoing_nodes():
     shared_parameters = {"standoff": 0.5}
     aruco_detector = Node(package="ur5e_visual_servo", executable="aruco_detector")
@@ -236,6 +256,7 @@ def visual_servoing_nodes():
         executable="pbvs_controller",
         parameters=[shared_parameters],
     )
+    return [aruco_detector, pbvs_controller]
 
 
 def launch_setup(context, *args, **kwargs):
@@ -287,6 +308,8 @@ def launch_setup(context, *args, **kwargs):
         *gazebo_nodes(),
         moveit_node(),
         servo_node(robot_desc),
+        start_servo_call(),
+        *visual_servoing_nodes(),
     ]
 
 
@@ -359,10 +382,15 @@ def _declare_arguments():
         ),
         DeclareLaunchArgument(
             "world",
-            default_value="",
-            description="Absolute path to a Gazebo .world file (empty = default empty world). "
-            "e.g. world:=$(ros2 pkg prefix ur_simulation_gazebo)/share/"
-            "ur_simulation_gazebo/worlds/servo_demo.world",
+            default_value=PathJoinSubstitution(
+                [
+                    FindPackageShare("ur_simulation_gazebo"),
+                    "worlds",
+                    "servo_demo.world",
+                ]
+            ),
+            description="Absolute path to a Gazebo .world file. Defaults to servo_demo.world, "
+            "which places the ArUco marker target in front of the robot for visual servoing.",
         ),
         DeclareLaunchArgument(
             "use_servo", default_value="true", description="Launch MoveIt Servo?"
